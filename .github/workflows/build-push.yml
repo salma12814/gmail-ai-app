@@ -1,87 +1,99 @@
-# ===== ENVIRONMENT VARIABLES (SECRETS!) =====
-.env
-.env.local
-.env.*.local
-.env.*.private
+name: CD - Build & Push Docker Images
 
-# ===== FRONTEND =====
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/.eslintcache
-frontend/coverage/
-frontend/.DS_Store
-frontend/*.log
+on:
+  push:
+    branches: [ main ]
 
-# ===== BACKEND =====
-backend/target/
-backend/.classpath
-backend/.project
-backend/.settings/
-backend/.idea/
-backend/*.iml
-backend/*.log
-backend/logs/
-backend/.factorypath
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
-# ===== DATABASE =====
-postgres_data/
-*.sql
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    name: Build & Push Frontend Image
+    permissions:
+      contents: read
+      packages: write
 
-# ===== REDIS =====
-redis_data/
-dump.rdb
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-# ===== GENERAL =====
-.DS_Store
-.vscode/
-*.swp
-*.swo
-*~
-.tmp/
-.cache/
-dist/
-build/
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-# ===== IDE =====
-*.iml
-.gradle/
-.classpath
-.project
-.settings/
-.vscode/
-*.code-workspace
-.idea/
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-# ===== DOCKER =====
-docker-compose.override.yml
+      - name: 🐳 Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-# ===== NODE/NPM =====
-package-lock.json
-npm-debug.log*
-yarn-error.log*
+  build-backend:
+    runs-on: ubuntu-latest
+    name: Build & Push Backend Image
+    permissions:
+      contents: read
+      packages: write
 
-# ===== GRADLE =====
-.gradle
-/build/
-gradle/
-gradlew
-gradlew.bat
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
 
-# ===== MAVEN =====
-.mvn/
-mvnw
-mvnw.cmd
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-# ===== GIT =====
-.git/
-.gitkeep
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-# ===== SENSITIVE FILES =====
-*.key
-*.pem
-*.jks
-*.p12
-credentials.json
-secrets.json
-private_key.json
+      - name: 🐳 Build and push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  notify:
+    runs-on: ubuntu-latest
+    name: Notify Build Success
+    needs: [ build-frontend, build-backend ]
+    if: success()
+
+    steps:
+      - name: ✅ Build Complete
+        run: |
+          echo "🎉 Docker images built and pushed successfully!"
+          echo "🐳 Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest"
+          echo "🐳 Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:latest"
