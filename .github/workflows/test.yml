@@ -1,0 +1,137 @@
+name: CI - Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # ============================================================
+  # FRONTEND TESTS
+  # ============================================================
+  test-frontend:
+    runs-on: ubuntu-latest
+    name: Frontend - Lint & Build
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: 📝 Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: 🔍 Lint code
+        working-directory: frontend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: 🔨 Build project
+        working-directory: frontend
+        run: npm run build
+
+      - name: 📊 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  # ============================================================
+  # BACKEND TESTS
+  # ============================================================
+  test-backend:
+    runs-on: ubuntu-latest
+    name: Backend - Maven Build & Test
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: gmail_ai_app
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 🔨 Build with Maven
+        working-directory: backend
+        run: mvn clean package -DskipTests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gmail_ai_app
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
+
+      - name: 🧪 Run tests
+        working-directory: backend
+        run: mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/gmail_ai_app
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
+
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/target/surefire-reports/
+
+  # ============================================================
+  # SUMMARY
+  # ============================================================
+  ci-summary:
+    runs-on: ubuntu-latest
+    name: CI Summary
+    needs: [ test-frontend, test-backend ]
+    if: always()
+
+    steps:
+      - name: ✅ CI Summary
+        run: |
+          echo "🎉 Frontend Tests: ${{ needs.test-frontend.result }}"
+          echo "🎉 Backend Tests: ${{ needs.test-backend.result }}"
+          
+          if [ "${{ needs.test-frontend.result }}" = "failure" ] || [ "${{ needs.test-backend.result }}" = "failure" ]; then
+            echo "❌ CI FAILED"
+            exit 1
+          fi
+          
+          echo "✅ All tests passed!"

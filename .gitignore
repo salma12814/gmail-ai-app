@@ -1,0 +1,87 @@
+# ===== ENVIRONMENT VARIABLES (SECRETS!) =====
+.env
+.env.local
+.env.*.local
+.env.*.private
+
+# ===== FRONTEND =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.eslintcache
+frontend/coverage/
+frontend/.DS_Store
+frontend/*.log
+
+# ===== BACKEND =====
+backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/.idea/
+backend/*.iml
+backend/*.log
+backend/logs/
+backend/.factorypath
+
+# ===== DATABASE =====
+postgres_data/
+*.sql
+
+# ===== REDIS =====
+redis_data/
+dump.rdb
+
+# ===== GENERAL =====
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+.tmp/
+.cache/
+dist/
+build/
+
+# ===== IDE =====
+*.iml
+.gradle/
+.classpath
+.project
+.settings/
+.vscode/
+*.code-workspace
+.idea/
+
+# ===== DOCKER =====
+docker-compose.override.yml
+
+# ===== NODE/NPM =====
+package-lock.json
+npm-debug.log*
+yarn-error.log*
+
+# ===== GRADLE =====
+.gradle
+/build/
+gradle/
+gradlew
+gradlew.bat
+
+# ===== MAVEN =====
+.mvn/
+mvnw
+mvnw.cmd
+
+# ===== GIT =====
+.git/
+.gitkeep
+
+# ===== SENSITIVE FILES =====
+*.key
+*.pem
+*.jks
+*.p12
+credentials.json
+secrets.json
+private_key.json
